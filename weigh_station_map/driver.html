@@ -60,7 +60,7 @@
   .btn:active{transform:scale(.98)}
   .note{font-size:12px;color:var(--muted);text-align:center;min-height:16px}
   /* start screen */
-  #start{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:center;padding:28px 22px calc(28px + env(safe-area-inset-bottom));gap:16px;overflow:auto;
+  #start{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:flex-start;padding:28px 22px calc(28px + env(safe-area-inset-bottom));gap:16px;overflow:auto;
     background:radial-gradient(100% 50% at 50% 0%,#c7d2fe 0%,transparent 70%),linear-gradient(180deg,#eef2ff,#f8fafc)}
   .hero{width:72px;height:72px;border-radius:22px;display:grid;place-items:center;background:linear-gradient(135deg,#2563eb,#7c3aed);box-shadow:0 14px 30px rgba(79,70,229,.35)}
   #start h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.02em}
@@ -70,8 +70,14 @@
   .feat div+div{border-top:1px solid var(--line)}
   .feat i{font-style:normal;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex:none;font-size:17px}
   .legal{font-size:12.5px;color:var(--muted)}
+  #start>:first-child{margin-top:auto} #start>:last-child{margin-bottom:auto}
   #start .btn{flex:none} #start .row .btn{flex:1}
   html,body{overflow-x:hidden}
+  .gpsline{border-radius:16px;padding:11px 14px;font-size:14px;font-weight:600;display:flex;gap:10px;align-items:center}
+  .gpsline.ok{color:#15803d} .gpsline.warn{color:#b45309} .gpsline.bad{color:var(--high)}
+  .gpshelp{border-radius:18px;padding:14px;font-size:13.5px;line-height:1.45}
+  .gpshelp ol{margin:8px 0 12px;padding-left:20px} .gpshelp li+li{margin-top:6px}
+  [hidden]{display:none!important}
   .err{color:var(--high);font-weight:600}
   .flash{animation:fl .9s ease 3}
   @keyframes fl{50%{box-shadow:0 0 0 4px var(--c),var(--shadow)}}
@@ -118,9 +124,27 @@
     <div><i style="background:#ede9fe">🛑</i>Warning before a high-risk state</div>
   </div>
   <p class="legal">Keep the screen on and this page open. Mount the phone and set it up before you drive. Always enter an open weigh station; bypassing one is a violation.</p>
+  <div class="gpsline glass" id="gpsline"><span>📍</span><span>Checking location…</span></div>
+  <div class="gpshelp glass" id="gpshelp" hidden>
+    <b>Turn on location for this page</b>
+    <ol id="help-ios">
+      <li>In Safari, tap the page icon <b>left of the address</b> → <b>Website Settings</b> → <b>Location</b> → <b>Allow</b>.</li>
+      <li>iPhone <b>Settings → Privacy &amp; Security → Location Services</b>: turn it <b>On</b>. Open <b>Safari Websites</b> → <b>While Using the App</b> and turn on <b>Precise Location</b>.</li>
+      <li><b>Settings → Apps → Safari → Location</b> → <b>Ask</b> or <b>Allow</b>.</li>
+      <li>Still blocked? <b>Settings → Screen Time → Content &amp; Privacy Restrictions → Location Services</b> → <b>Allow Changes</b>.</li>
+      <li>If the page opened inside another app (WhatsApp, Instagram…), open it in <b>Safari</b>.</li>
+    </ol>
+    <ol id="help-android">
+      <li>Tap the icon <b>left of the address</b> → <b>Permissions</b> (or Site settings) → <b>Location</b> → <b>Allow</b>.</li>
+      <li>Phone <b>Settings → Location</b>: turn it <b>On</b> and allow it for your browser.</li>
+      <li>If the page opened inside another app, open it in <b>Chrome</b>.</li>
+    </ol>
+    <button class="btn sec" id="gpsretry" style="width:100%">↻ Try again</button>
+  </div>
   <button class="btn" id="go">Start driving</button>
   <div class="row"><button class="btn sec" id="testvoice" style="flex:1">🔊 Test voice</button><button class="btn sec" id="go-demo" style="flex:1">▶ Demo</button></div>
   <div id="starterr" class="err"></div>
+  <p class="legal" id="a2hs" hidden>Tip: tap <b>Share ⬆︎ → Add to Home Screen</b> to open Driver Mode full screen like an app. It will ask for location once more the first time.</p>
 </div>
 
 <script>
@@ -180,16 +204,24 @@ function stateAt(lon,lat){ for(const f of STATES.features){const g=f.geometry, p
 let curState=null, stTick=0;
 
 // ---------- state ----------
-let last=null, heading=null, here=null, muted=false, watchId=null, simTimer=null, wake=null;
+let last=null, anchor=null, heading=null, here=null, muted=false, watchId=null, simTimer=null, wake=null;
 const ROADBUF=[];
 function stableRoad(r){ROADBUF.push(r); if(ROADBUF.length>5) ROADBUF.shift();
   const c={}; ROADBUF.forEach(x=>{if(x) c[x]=(c[x]||0)+1;});
   const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0]; return top&&top[1]>=2?top[0]:null;}
+function resetTrack(){ last=null; anchor=null; heading=null; here=null; curState=null; stTick=0;
+  ROADBUF.length=0; fired.clear(); xfired.clear(); }
 
-function onPos(lon,lat,spd,hdg){
-  if(last){const mv=hav(last.lon,last.lat,lon,lat);
-    if(spd!=null&&spd>3&&hdg!=null&&!isNaN(hdg)) heading=hdg; else if(mv>25) heading=brg(last.lon,last.lat,lon,lat);}
-  else if(spd!=null&&spd>3&&hdg!=null&&!isNaN(hdg)) heading=hdg;
+// acc = GPS accuracy in metres (demo passes none)
+function onPos(lon,lat,spd,hdg,acc){
+  acc=acc||5;
+  if(spd!=null&&(isNaN(spd)||spd<0)) spd=null;   // some phones report -1 / NaN when unknown
+  if(hdg!=null&&(isNaN(hdg)||hdg<0)) hdg=null;
+  if(spd!=null&&spd>3&&hdg!=null){ heading=hdg; anchor={lon,lat}; }
+  else if(anchor){ // direction from movement: only over a distance well beyond GPS noise, and not while stopped
+    const mv=hav(anchor.lon,anchor.lat,lon,lat);
+    if(mv>Math.max(30,2*acc)){ if(spd==null||spd>2) heading=brg(anchor.lon,anchor.lat,lon,lat); anchor={lon,lat}; } }
+  if(!anchor) anchor={lon,lat};
   last={lon,lat};
   if(stTick++%5===0) curState=stateAt(lon,lat)||curState;
   $('speed').textContent= spd!=null?Math.round(spd*2.23694):'–';
@@ -319,7 +351,7 @@ function beep(strong){try{actx=actx||new (window.AudioContext||window.webkitAudi
     os.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.0001,actx.currentTime+o);g.gain.exponentialRampToValueAtTime(.4,actx.currentTime+o+.02);
     g.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+o+.22);os.start(actx.currentTime+o);os.stop(actx.currentTime+o+.25);});}catch(e){}}
 function notify(text,strong,clips){
-  $('status').textContent=text; $('next').classList.remove('flash'); void $('next').offsetWidth; $('next').classList.add('flash');
+  gpsErrShown=false; $('status').textContent=text; $('next').classList.remove('flash'); void $('next').offsetWidth; $('next').classList.add('flash');
   if(!muted) beep(strong); setTimeout(()=>playClips(clips),strong?550:300);
   if(navigator.vibrate) navigator.vibrate(strong?[300,150,300,150,300]:[250]);
   try{ if('Notification' in window && Notification.permission==='granted' && document.visibilityState!=='visible') new Notification('Weigh station',{body:text}); }catch(e){}
@@ -327,24 +359,86 @@ function notify(text,strong,clips){
 function unlockAudio(){beep(false); try{player.src='audio/on.wav'; player.muted=true; const q=player.play();
   if(q&&q.then) q.then(()=>{ if(player.muted){player.pause();player.muted=false;} }).catch(()=>{player.muted=false;});}catch(e){} }
 
+// ---------- GPS permission + tracking ----------
+// The location prompt is shown as soon as the page opens, so GPS is ready before "Start driving".
+// A page can only ask; the driver has to tap "Allow".
+const DEFAULT_NOTE='Do not handle the phone while driving. Alerts are spoken.';
+const MAX_ACC=100;                     // ignore fixes worse than ±100 m
+let driving=false, gpsState='idle', lastFix=null, gpsErrShown=false;
+const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+const STANDALONE=navigator.standalone===true || matchMedia('(display-mode: standalone)').matches;
+
+function setGpsLine(icon,text,cls){ const el=$('gpsline'); el.className='gpsline '+(cls||''); el.innerHTML=`<span>${icon}</span><span>${text}</span>`; }
+function showGpsHelp(on){ $('gpshelp').hidden=!on; }
+function mainNote(html,isErr){ $('status').innerHTML= isErr?`<span class="err">${html}</span>`:html; gpsErrShown=!!isErr; }
+
+function onFix(p){
+  const c=p.coords, acc=c.accuracy||0;
+  if(gpsState!=='ok'){ gpsState='ok'; showGpsHelp(false); }
+  if(acc>MAX_ACC){
+    setGpsLine('📡',`Weak GPS signal (±${Math.round(acc)} m). Move to open sky…`,'warn');
+    if(driving && !simTimer) mainNote(`Weak GPS signal (±${Math.round(acc)} m)…`,true);
+    return;
+  }
+  setGpsLine('✅',`GPS ready (±${Math.round(acc)} m)`,'ok');
+  if(gpsErrShown) mainNote(DEFAULT_NOTE,false);
+  lastFix={lon:c.longitude,lat:c.latitude,spd:c.speed,hdg:c.heading,acc,t:Date.now()};
+  if(driving && !simTimer) onPos(lastFix.lon,lastFix.lat,lastFix.spd,lastFix.hdg,acc);
+}
+function onGpsErr(e){
+  if(e.code===1){ // PERMISSION_DENIED
+    gpsState='denied'; stopWatch();
+    setGpsLine('⛔','Location is blocked for this page.','bad'); showGpsHelp(true);
+    if(driving && !simTimer){ driving=false; $('start').style.display='flex'; }
+    return;
+  }
+  // POSITION_UNAVAILABLE / TIMEOUT: the watch keeps running, it is usually a tunnel or indoors
+  setGpsLine('📡','Searching for GPS signal…','warn');
+  if(driving && !simTimer) mainNote('Searching for GPS signal…',true);
+}
+function startWatch(){
+  if(!('geolocation' in navigator)){ setGpsLine('⛔','This browser does not support GPS.','bad'); return false; }
+  if(!window.isSecureContext){ setGpsLine('⛔','GPS only works over HTTPS. Open this page from an HTTPS link.','bad'); return false; }
+  if(watchId!=null) return true;
+  if(gpsState!=='ok') { gpsState='asking'; setGpsLine('📍','Asking for your location… tap <b>Allow</b>.',''); }
+  watchId=navigator.geolocation.watchPosition(onFix,onGpsErr,{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+  return true;
+}
+function stopWatch(){ if(watchId!=null) navigator.geolocation.clearWatch(watchId); watchId=null; }
+
+async function initGps(){
+  // help text for the phone in hand
+  $(IOS?'help-android':'help-ios').remove();
+  if(IOS && !STANDALONE) $('a2hs').hidden=false;
+  let st='prompt';
+  try{ if(navigator.permissions&&navigator.permissions.query){ const ps=await navigator.permissions.query({name:'geolocation'}); st=ps.state;
+    ps.onchange=()=>{ if(ps.state!=='denied' && gpsState==='denied'){ gpsState='idle'; startWatch(); } }; } }catch(e){}
+  if(st==='denied'){ gpsState='denied'; setGpsLine('⛔','Location is blocked for this page.','bad'); showGpsHelp(true); }
+  else startWatch();   // 'granted' starts silently, 'prompt' shows the Allow dialog now
+}
+$('gpsretry').onclick=()=>{ if(gpsState==='denied'){ gpsState='idle'; } stopWatch(); startWatch(); };
+
 // ---------- start / stop / demo ----------
 async function keepAwake(){try{if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen');}catch(e){}}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&(watchId!=null||simTimer)) keepAwake();});
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible') return;
+  if(driving||simTimer) keepAwake();
+  if(gpsState==='denied'){ gpsState='idle'; startWatch(); }   // came back from Settings: try again
+});
 $('testvoice').onclick=()=>{ unlockAudio(); playClips(['test']); };
 $('go').onclick=async()=>{
   unlockAudio(); keepAwake();
   try{ if('Notification' in window && Notification.permission==='default') await Notification.requestPermission(); }catch(e){}
-  if(!('geolocation' in navigator)){ $('starterr').textContent='This browser does not support GPS.'; return; }
-  if(!window.isSecureContext){ $('starterr').textContent='GPS only works over HTTPS. Open this page from an HTTPS link.'; return; }
-  watchId=navigator.geolocation.watchPosition(p=>onPos(p.coords.longitude,p.coords.latitude,p.coords.speed,p.coords.heading),
-    e=>{$('status').innerHTML=`<span class="err">GPS error: ${e.message}</span>`;},{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+  if(gpsState==='denied'){ gpsState='idle'; }
+  if(!startWatch()){ $('starterr').textContent=$('gpsline').textContent; return; }
+  clearInterval(simTimer); simTimer=null; resetTrack(); driving=true;
+  mainNote(DEFAULT_NOTE,false);
   $('start').style.display='none'; playClips(['on']);
+  if(lastFix && Date.now()-lastFix.t<10000) onPos(lastFix.lon,lastFix.lat,lastFix.spd,lastFix.hdg,lastFix.acc);
 };
 function startDemo(){
   // drive along the real I-44 line toward the Joplin station, starting 30 miles out, at 6x speed
   unlockAudio(); keepAwake(); $('start').style.display='none';
-  if(watchId!=null){navigator.geolocation.clearWatch(watchId);watchId=null;}
-  clearInterval(simTimer); fired.clear(); xfired.clear(); ROADBUF.length=0; heading=null; last=null; curState=null; stTick=0;
+  driving=false; clearInterval(simTimer); resetTrack(); mainNote(DEFAULT_NOTE,false);
   const J=STN.find(s=>/^Joplin/.test(s.name)); if(!J||!J.snap){ $('status').textContent='Demo data not found.'; return; }
   const P=PARTS[J.snap.pi], end=P.cum[P.cum.length-1];
   const westSign = P.c[0][0] < P.c[P.c.length-1][0] ? -1 : 1; // which way along the line is west
@@ -360,8 +454,10 @@ function startDemo(){
 }
 $('go-demo').onclick=startDemo; $('sim').onclick=startDemo;
 if(location.hash==='#demo') setTimeout(startDemo,300);
-$('stopbtn').onclick=()=>{ if(watchId!=null) navigator.geolocation.clearWatch(watchId); watchId=null; clearInterval(simTimer); simTimer=null;
-  try{wake&&wake.release();}catch(e){} player.pause(); clipQ=[]; $('start').style.display='flex'; fired.clear(); xfired.clear(); ROADBUF.length=0; };
+$('stopbtn').onclick=()=>{ driving=false; clearInterval(simTimer); simTimer=null;
+  try{wake&&wake.release();}catch(e){} player.pause(); clipQ=[]; resetTrack(); mainNote(DEFAULT_NOTE,false);
+  $('speed').textContent='–'; $('roadname').textContent='Waiting for GPS…'; $('start').style.display='flex'; };
+initGps();
 $('mute').onclick=()=>{muted=!muted; $('mute').textContent=muted?'🔇':'🔊'; if(muted){player.pause(); clipQ=[];}};
 </script>
 </body>
