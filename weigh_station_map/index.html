@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weigh Stations Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js"></script>
+<script src="data.js"></script>
+<script src="cams.js"></script>
+<style>
+  :root{
+    --bg:#eef1f5; --panel:rgba(255,255,255,.92); --card:#f6f8fb; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+    --high:#e5484d; --elev:#f59e0b; --norm:#3b82f6; --unk:#94a3b8; --cross:#8b5cf6; --accent:#0f172a;
+    --shadow:0 10px 30px rgba(15,23,42,.12),0 2px 6px rgba(15,23,42,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+  #map{position:absolute;inset:0}
+  #side{position:absolute;top:16px;left:16px;bottom:16px;width:360px;max-width:calc(100% - 32px);overflow:auto;
+    background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.6);border-radius:18px;box-shadow:var(--shadow);padding:20px 18px;z-index:2}
+  .brand{display:flex;align-items:center;gap:10px}
+  .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#0f172a,#334155);display:grid;place-items:center;flex:none}
+  h1{font-size:17px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:12.5px;margin:10px 0 0}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:16px}
+  .stat b{font-size:18px !important}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+  .stat b{display:block;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .stat span{font-size:11px;color:var(--muted)}
+  h2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:22px 0 8px}
+  .layer{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;user-select:none}
+  .layer:hover{background:var(--card)}
+  .layer input{display:none}
+  .sw{width:32px;height:18px;border-radius:9px;background:#cbd5e1;position:relative;flex:none;transition:.2s}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:.2s}
+  .layer input:checked + .sw{background:var(--accent)}
+  .layer input:checked + .sw::after{left:16px}
+  .dot{width:11px;height:11px;border-radius:50%;flex:none;box-shadow:0 0 0 2px #fff,0 0 0 3px rgba(15,23,42,.12)}
+  .dia{width:10px;height:10px;transform:rotate(45deg);border-radius:2px;flex:none;background:var(--cross);box-shadow:0 0 0 2px #fff,0 0 0 3px rgba(15,23,42,.12)}
+  .count{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+  .search{position:relative}
+  .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.5}
+  input[type=search]{width:100%;padding:10px 12px 10px 34px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font:inherit;outline:none;transition:.15s}
+  input[type=search]:focus{border-color:#94a3b8;box-shadow:0 0 0 4px rgba(148,163,184,.25)}
+  .states{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+  .states li{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;transition:.15s;border-left:4px solid var(--c)}
+  .states li:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(15,23,42,.08)}
+  .row{display:flex;align-items:center;gap:8px}
+  .pill{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
+  .why{color:var(--muted);font-size:12.5px;margin-top:4px}
+  .note{font-size:11.5px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:18px}
+  .mapboxgl-popup-content{font:13px/1.45 Inter,system-ui,sans-serif;color:var(--ink);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);max-width:300px}
+  .mapboxgl-popup-close-button{font-size:18px;padding:4px 8px;color:var(--muted)}
+  .pp-t{font-weight:700;font-size:14px;margin-bottom:2px}
+  .pp-m{color:var(--muted);font-size:12px}
+  .pp-hot{margin-top:8px;padding:8px 10px;border-radius:10px;background:#fef2f2;color:#b42318;font-size:12px}
+  .pp-a{margin-top:10px;display:flex;gap:8px}
+  .pp-a a{font-size:12px;font-weight:600;color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:4px 9px}
+  .pp-a a:hover{background:var(--card)}
+  .mapboxgl-ctrl-group{border-radius:12px !important;box-shadow:var(--shadow) !important;overflow:hidden}
+  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+  .seg button{flex:1;border:0;background:transparent;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);padding:6px 0;border-radius:8px;cursor:pointer}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(15,23,42,.12)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+  .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .chip.sm{font-weight:500}
+  .btns{display:flex;gap:8px;margin-top:10px}
+  .btn{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 0;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink);cursor:pointer}
+  .btn:hover{background:var(--card)}
+  .cam{width:11px;height:11px;border-radius:3px;flex:none;box-shadow:0 0 0 2px #fff,0 0 0 3px rgba(15,23,42,.12)}
+  .lbl{font-size:12px;color:var(--muted);margin:10px 0 6px}
+  .warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 10px;margin-top:8px}
+  @media (max-width:760px){ #side{top:auto;left:8px;right:8px;bottom:8px;width:auto;max-height:48%;padding:16px} }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<aside id="side">
+  <div class="brand">
+    <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/></svg></div>
+    <div><h1>Weigh Stations &amp; State Lines</h1><div class="pp-m">Weigh stations · state lines · ALPR cameras · USA</div></div>
+  </div>
+  <p class="sub">Shows only state weigh stations and highway state-line crossings. Red and orange mark the states with the strictest truck enforcement.</p>
+
+  <a href="driver.html" class="btn" style="display:block;text-align:center;text-decoration:none;margin-top:14px;background:#0f172a;color:#fff;border-color:#0f172a">🚚 Driver mode (mobile)</a>
+  <div class="seg" id="basemap" style="margin-top:10px"><button data-s="light" class="on" onclick="setBasemap('light')">Map</button><button data-s="sat" onclick="setBasemap('sat')">Satellite</button></div>
+  <div class="stats">
+    <div class="stat"><b id="s-w">–</b><span>stations</span></div>
+    <div class="stat"><b id="s-x">–</b><span>crossings</span></div>
+    <div class="stat"><b id="s-h" style="color:var(--high)">–</b><span>high-risk</span></div>
+    <div class="stat"><b id="s-c">–</b><span>cameras</span></div>
+  </div>
+
+  <h2>Layers</h2>
+  <label class="layer"><input type="checkbox" id="l-high" checked><span class="sw"></span><span class="dot" style="background:var(--high)"></span>Stations, high risk<span class="count" id="c-high"></span></label>
+  <label class="layer"><input type="checkbox" id="l-elev" checked><span class="sw"></span><span class="dot" style="background:var(--elev)"></span>Stations, elevated risk<span class="count" id="c-elev"></span></label>
+  <label class="layer"><input type="checkbox" id="l-norm" checked><span class="sw"></span><span class="dot" style="background:var(--norm)"></span>Stations, other states<span class="count" id="c-norm"></span></label>
+  <label class="layer"><input type="checkbox" id="l-unk"><span class="sw"></span><span class="dot" style="background:var(--unk)"></span>Unconfirmed stations<span class="count" id="c-unk"></span></label>
+  <label class="layer"><input type="checkbox" id="l-xi" checked><span class="sw"></span><span class="dia"></span>Crossings, Interstate<span class="count" id="c-xi"></span></label>
+  <label class="layer"><input type="checkbox" id="l-xu"><span class="sw"></span><span class="dia" style="opacity:.5"></span>Crossings, US highways<span class="count" id="c-xu"></span></label>
+  <label class="layer"><input type="checkbox" id="l-fill" checked><span class="sw"></span><span class="dot" style="background:linear-gradient(135deg,var(--high),var(--elev))"></span>Shade high-risk states</label>
+
+  <h2>Flock / ALPR cameras on corridors</h2>
+  <div class="lbl">Show cameras</div>
+  <div class="seg" id="cmode"><button data-m="w" class="on">At stations <span id="c-camw"></span></button><button data-m="p">Flagged <span id="c-camp"></span></button><button data-m="a">All <span id="c-cama"></span></button></div>
+  <div class="lbl">Max distance from weigh station</div>
+  <div class="seg" id="wdist"><button data-km="0.5">0.5 km</button><button data-km="1" class="on">1 km</button><button data-km="2">2 km</button></div>
+  <label class="layer"><input type="checkbox" id="l-rt" checked><span class="sw"></span><span style="width:16px;height:3px;border-radius:2px;background:#0ea5e9;flex:none"></span>Interstate corridors</label>
+  <div class="lbl">Max distance from highway</div>
+  <div class="seg" id="dist"><button data-km="1" class="on">1 km</button><button data-km="5">5 km</button><button data-km="10">10 km</button></div>
+  <div class="lbl">Routes <span style="float:right"><a href="#" id="r-prio" style="color:var(--muted)">priority</a> · <a href="#" id="r-all" style="color:var(--muted)">all</a> · <a href="#" id="r-none" style="color:var(--muted)">none</a></span></div>
+  <div class="chips" id="routes"></div>
+  <div class="btns"><button class="btn" id="exp-geo">Export GeoJSON</button><button class="btn" id="exp-csv">Export CSV</button></div>
+  <div class="warn" id="cam-warn" hidden></div>
+  <p class="sub" style="font-size:11.5px">“At stations” shows cameras within the chosen distance of the highway (default 1 km / 0.6 mi) and of a state weigh station. “Flagged” means a camera within 3 km of a weigh station or 5 km of a state-line crossing. Source: OpenStreetMap nodes tagged <code>surveillance:type=ALPR</code>, the same data DeFlock shows. Data is incomplete and may be out of date.</p>
+
+  <h2>Search</h2>
+  <div class="search">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input type="search" id="q" placeholder="I-84, Umatilla, TX…">
+  </div>
+
+  <h2>Highest-risk states</h2>
+  <ul class="states" id="risk"></ul>
+
+  <div class="note">Rankings are based on public reports (FMCSA via TTNews, ODOT, FHWA, Overdrive). There is no public list of citations per individual weigh station, so risk is rated per state. Stations named in reports have a larger marker with a dark ring. Station locations: OpenStreetMap (ODbL) plus manually confirmed sites. Crossings computed from Natural Earth roads and state boundaries.</div>
+</aside>
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiZGFja2VsbG83NyIsImEiOiJjbWNuM21paHYwcmF4MmpyMGIxNnlrZmZ0In0.BgdalQ2ZLvPou3XUYBNMdg';
+
+const RISK = {
+  CA:{t:'h',why:'Most out-of-service violations in the US in 2025 (1,385 from 6,400 inspections, Jan–Aug). #2 in inspection intensity.'},
+  TX:{t:'h',why:'1,304 OOS from 3,471 inspections (~38%) in 2025. Most English-proficiency OOS violations after June 2025 (7,000+). #2 for brake violations.'},
+  AZ:{t:'h',why:'1,198 OOS from 3,231 inspections (~37%) in 2025 (Jan–Aug).'},
+  MD:{t:'h',why:'252 OOS from 464 inspections (~54%) in 2025. #1 in inspection intensity. 10 virtual weigh stations with cameras and WIM sensors.'},
+  OR:{t:'h',why:'Bypass cameras at all 6 ports of entry (fine up to $2,500). 2025 I-84 blitz: 490 stopped, 122 placed out of service. ARIES camera pilot from summer 2026.'},
+  IN:{t:'h',why:'Highest share of HOS violations in 2025 (over 1 in 4). 2,600 weight citations in 2022. Virtual weigh stations.'},
+  KY:{t:'e',why:'2,616 weigh-station bypass charges 2017–2021. Camera-equipped virtual weigh station (US-25, Laurel County).'},
+  TN:{t:'e',why:'Virtual weigh stations with USDOT-number and license-plate readers. I-40 Memphis handles about 1 million trucks a year.'},
+  OK:{t:'e',why:'Virtual weigh stations with ALPR cameras and USDOT-number readers.'},
+  CT:{t:'e',why:'Most violations per inspection in the US (3+), Overdrive 2016.'},
+  PA:{t:'e',why:'Rising fast in inspection intensity (Overdrive).'},
+  ND:{t:'e',why:'#1 for brake violations in 2025 (Overdrive, Sept 2025).'},
+  MO:{t:'e',why:'Joplin I-44 (MM ~3): carriers report very strict enforcement. Drivewyze lists Joplin among the highest-volume stations in MO. Two Flock cameras at the station.'},
+  AR:{t:'e',why:'#1 for HOS violations several years running (Overdrive 2014–2018).'},
+  NM:{t:'e',why:'Top-10 in inspection intensity (#6, Overdrive). Lordsburg I-10 POE ~22.9% out-of-service rate (third-party FMCSA aggregate). Infrared brake scanners at two ports.'}
+};
+const tierOf = st => (RISK[st] && RISK[st].t) || 'n';
+const C={h:'#e5484d',e:'#f59e0b',n:'#3b82f6',u:'#94a3b8',x:'#8b5cf6'};
+
+WEIGH.features.forEach(f=>{const p=f.properties; p.tier = p.cls==='unk' ? 'u' : tierOf(p.st); p.hotf = p.hot?1:0;});
+CROSS.features.forEach(f=>{const p=f.properties; const a=tierOf(p.from), b=tierOf(p.to);
+  p.risk = (a==='h'||b==='h')?'h':(a==='e'||b==='e')?'e':'n'; p.ki = p.kind==='Interstate'?'i':'u';});
+STATES.features.forEach(f=>{f.properties.tier = tierOf(f.properties.st);});
+
+const cnt=(fc,fn)=>fc.features.filter(fn).length, set=(id,v)=>document.getElementById(id).textContent=v.toLocaleString('en-US');
+set('c-high',cnt(WEIGH,f=>f.properties.tier==='h')); set('c-elev',cnt(WEIGH,f=>f.properties.tier==='e'));
+set('c-norm',cnt(WEIGH,f=>f.properties.tier==='n')); set('c-unk',cnt(WEIGH,f=>f.properties.tier==='u'));
+set('c-xi',cnt(CROSS,f=>f.properties.ki==='i')); set('c-xu',cnt(CROSS,f=>f.properties.ki==='u'));
+set('s-w',cnt(WEIGH,f=>f.properties.tier!=='u')); set('s-x',CROSS.features.length);
+set('s-h',cnt(WEIGH,f=>f.properties.tier==='h'||f.properties.tier==='e'));
+
+const map = new mapboxgl.Map({container:'map', style:'mapbox://styles/mapbox/light-v11', center:[-96,38.5], zoom:3.7, projection:'mercator'});
+map.addControl(new mapboxgl.NavigationControl({showCompass:false}),'top-right');
+map.addControl(new mapboxgl.ScaleControl({unit:'imperial'}),'bottom-right');
+
+const STYLES={light:'mapbox://styles/mapbox/light-v11',sat:'mapbox://styles/mapbox/satellite-streets-v12'};
+let curStyle='light';
+function addData(){
+  if(map.getSource('states')) return;
+  if(curStyle==='light'){
+    // subtler basemap: soften water and roads, emphasize highways
+    const L = map.getStyle().layers.map(l=>l.id);
+    if(L.includes('water')) map.setPaintProperty('water','fill-color','#dbe7f3');
+    L.filter(id=>/^road-(motorway|trunk)/.test(id) && map.getLayer(id).type==='line').forEach(id=>map.setPaintProperty(id,'line-color','#c9d2de'));
+  }
+
+  map.addSource('states',{type:'geojson',data:STATES});
+  map.addSource('weigh',{type:'geojson',data:WEIGH});
+  map.addSource('cross',{type:'geojson',data:CROSS});
+
+  const risky=['in',['get','tier'],['literal',['h','e']]];
+  map.addLayer({id:'st-fill',type:'fill',source:'states',filter:risky,paint:{'fill-color':['match',['get','tier'],'h',C.h,C.e],'fill-opacity':0.07}});
+  map.addLayer({id:'st-line',type:'line',source:'states',filter:risky,paint:{'line-color':['match',['get','tier'],'h',C.h,C.e],'line-width':1.4,'line-opacity':.45}});
+  map.addLayer({id:'st-lbl',type:'symbol',source:'states',filter:risky,maxzoom:6,layout:{'text-field':['get','st'],'text-size':12,'text-font':['DIN Pro Bold','Arial Unicode MS Bold'],'text-letter-spacing':.1},
+    paint:{'text-color':['match',['get','tier'],'h',C.h,'#b45309'],'text-opacity':.55,'text-halo-color':'#fff','text-halo-width':1}});
+
+  map.addSource('routes',{type:'geojson',data:ROUTES});
+  map.addLayer({id:'rt-casing',type:'line',source:'routes',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],3,['case',['==',['get','prio'],1],3.5,2],10,8]}});
+  map.addLayer({id:'rt',type:'line',source:'routes',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#0ea5e9','line-opacity':.75,'line-width':['interpolate',['linear'],['zoom'],3,['case',['==',['get','prio'],1],2,1],10,5]}});
+  map.addLayer({id:'rt-lbl',type:'symbol',source:'routes',minzoom:5,layout:{'symbol-placement':'line','symbol-spacing':400,'text-field':['get','route'],'text-size':11,'text-font':['DIN Pro Bold','Arial Unicode MS Bold']},
+    paint:{'text-color':'#0369a1','text-halo-color':'#fff','text-halo-width':1.6}});
+  // Exact road geometry from the basemap's own vector tiles (Mapbox Streets v8) at closer zooms
+  ['rt-casing','rt','rt-lbl'].forEach(l=>map.setLayerZoomRange(l, l==='rt-lbl'?5:0, 6.5));
+  if(map.getSource('composite')){
+    const exactF=['all',['match',['get','class'],['motorway','trunk'],true,false],
+      ['match',['get','shield'],['us-interstate','us-interstate-duplex','us-interstate-truck'],true,false]];
+    const roadAbove = map.getLayer('cross') ? 'cross' : undefined;
+    map.addLayer({id:'rtx-casing',type:'line',source:'composite','source-layer':'road',minzoom:6,filter:exactF,layout:{'line-cap':'round','line-join':'round'},
+      paint:{'line-color':'#fff','line-opacity':.9,'line-width':['interpolate',['exponential',2],['zoom'],6,3,10,6,16,18,18,48,20,180,22,700]}});
+    map.addLayer({id:'rtx',type:'line',source:'composite','source-layer':'road',minzoom:6,filter:exactF,layout:{'line-cap':'round','line-join':'round'},
+      paint:{'line-color':'#0ea5e9','line-opacity':.85,'line-width':['interpolate',['exponential',2],['zoom'],6,1.6,10,3.5,16,10,18,32,20,120,22,460]}});
+    // At zoom < 11 Mapbox drops the ref/shield on some Interstate pieces, which left gaps.
+    // Fill them with the same style: motorway pieces that carry no ref (only at those zooms).
+    const gapF=['all',['==',['get','class'],'motorway'],['!',['has','ref']]];
+    map.addLayer({id:'rtg-casing',type:'line',source:'composite','source-layer':'road',minzoom:6,maxzoom:11,filter:gapF,layout:{'line-cap':'round','line-join':'round'},
+      paint:{'line-color':'#fff','line-opacity':.9,'line-width':['interpolate',['exponential',2],['zoom'],6,3,10,6,16,18]}},'rtx-casing');
+    map.addLayer({id:'rtg',type:'line',source:'composite','source-layer':'road',minzoom:6,maxzoom:11,filter:gapF,layout:{'line-cap':'round','line-join':'round'},
+      paint:{'line-color':'#0ea5e9','line-opacity':.85,'line-width':['interpolate',['exponential',2],['zoom'],6,1.6,10,3.5,16,10]}},'rtx-casing');
+    map.addLayer({id:'rtx-lbl',type:'symbol',source:'composite','source-layer':'road',minzoom:6.5,filter:exactF,
+      layout:{'symbol-placement':'line','symbol-spacing':['interpolate',['linear'],['zoom'],7,350,16,600],'text-field':['concat','I-',['to-string',['get','ref']]],
+        'text-size':['interpolate',['linear'],['zoom'],7,11,14,13,18,16],'text-font':['DIN Pro Bold','Arial Unicode MS Bold'],'text-letter-spacing':.04,'text-rotation-alignment':'map','text-keep-upright':true},
+      paint:{'text-color':'#0c4a6e','text-halo-color':'#ffffff','text-halo-width':2}});
+  }
+
+  map.addSource('cams',{type:'geojson',data:{type:'FeatureCollection',features:[]},cluster:true,clusterMaxZoom:11,clusterRadius:40,
+    clusterProperties:{prob:['+',['get','prob']]}});
+  map.addLayer({id:'cam-cl',type:'circle',source:'cams',filter:['has','point_count'],paint:{
+    'circle-color':['case',['>',['get','prob'],0],'#0f172a','#64748b'],'circle-opacity':.9,'circle-stroke-color':'#fff','circle-stroke-width':2,
+    'circle-radius':['step',['get','point_count'],12,20,16,100,21,500,27]}});
+  map.addLayer({id:'cam-cl-n',type:'symbol',source:'cams',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-size':11,'text-font':['DIN Pro Bold','Arial Unicode MS Bold']},paint:{'text-color':'#fff'}});
+  map.addLayer({id:'cam',type:'circle',source:'cams',filter:['!',['has','point_count']],paint:{
+    'circle-color':['case',['==',['get','prob'],1],'#0f172a','#64748b'],'circle-radius':['interpolate',['linear'],['zoom'],5,3.5,12,7],
+    'circle-stroke-color':['case',['==',['get','prob'],1],'#e5484d','#fff'],'circle-stroke-width':['case',['==',['get','prob'],1],2,1.2]}});
+
+  map.addLayer({id:'cross',type:'symbol',source:'cross',layout:{'text-field':'◆','text-size':['interpolate',['linear'],['zoom'],3,10,8,18],'text-allow-overlap':true,'text-ignore-placement':true},
+    paint:{'text-color':['match',['get','risk'],'h',C.h,'e',C.e,C.x],'text-halo-color':'#fff','text-halo-width':1.6,'text-opacity':['match',['get','ki'],'i',1,.55]}});
+  map.addLayer({id:'cross-lbl',type:'symbol',source:'cross',minzoom:6.5,layout:{'text-field':['concat',['get','route'],'  ',['get','from'],' → ',['get','to']],'text-size':11,'text-offset':[0,1.3],'text-font':['DIN Pro Medium','Arial Unicode MS Regular']},
+    paint:{'text-color':'#5b21b6','text-halo-color':'#fff','text-halo-width':1.4}});
+
+  map.addLayer({id:'weigh-halo',type:'circle',source:'weigh',filter:['==',['get','hotf'],1],paint:{
+    'circle-color':C.h,'circle-opacity':.18,'circle-radius':['interpolate',['linear'],['zoom'],3,10,10,22]}});
+  map.addLayer({id:'weigh',type:'circle',source:'weigh',paint:{
+    'circle-color':['match',['get','tier'],'h',C.h,'e',C.e,'u',C.u,C.n],
+    'circle-radius':['interpolate',['linear'],['zoom'],3,['+',3,['*',2.5,['get','hotf']]],10,['+',7,['*',4,['get','hotf']]]],
+    'circle-stroke-color':['case',['==',['get','hotf'],1],'#0f172a','#ffffff'],
+    'circle-stroke-width':['case',['==',['get','hotf'],1],2,1.5]}});
+  map.addLayer({id:'weigh-lbl',type:'symbol',source:'weigh',minzoom:8,filter:['!=',['get','tier'],'u'],layout:{'text-field':['get','name'],'text-size':11,'text-offset':[0,1.4],'text-font':['DIN Pro Medium','Arial Unicode MS Regular']},
+    paint:{'text-color':'#334155','text-halo-color':'#fff','text-halo-width':1.4}});
+
+  if(curStyle==='sat'){
+    map.setPaintProperty('rt','line-color','#38bdf8'); map.setPaintProperty('rt','line-opacity',.9);
+    map.setPaintProperty('rt-casing','line-color','#0c4a6e');
+    if(map.getLayer('rtx')){ map.setPaintProperty('rtx','line-color','#38bdf8'); map.setPaintProperty('rtx','line-opacity',.75); map.setPaintProperty('rtx-casing','line-color','#0c4a6e'); map.setPaintProperty('rtx-casing','line-opacity',.6); map.setPaintProperty('rtg','line-color','#38bdf8'); map.setPaintProperty('rtg','line-opacity',.75); map.setPaintProperty('rtg-casing','line-color','#0c4a6e'); map.setPaintProperty('rtg-casing','line-opacity',.6); map.setPaintProperty('rtx-lbl','text-color','#ffffff'); map.setPaintProperty('rtx-lbl','text-halo-color','#0c4a6e'); }
+    map.setPaintProperty('st-fill','fill-opacity',0.12);
+    map.setPaintProperty('cam','circle-color',['case',['==',['get','prob'],1],'#facc15','#e2e8f0']);
+    map.setPaintProperty('cam','circle-stroke-color',['case',['==',['get','prob'],1],'#e5484d','#0f172a']);
+    map.setPaintProperty('cam-cl','circle-color',['case',['>',['get','prob'],0],'#eab308','#475569']);
+  }
+  applyFilters(); updateCams();
+}
+map.on('style.load',addData);
+function setBasemap(s){
+  if(s===curStyle) return; curStyle=s;
+  document.querySelectorAll('#basemap button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
+  map.setStyle(STYLES[s]);
+}
+
+map.on('load',()=>{
+
+  const tierTxt={h:['High risk',C.h],e:['Elevated risk',C.e],n:['Standard',C.n],u:['Unconfirmed',C.u]};
+  const pill=(t)=>`<span class="pill" style="--c:${tierTxt[t][1]}">${tierTxt[t][0]}</span>`;
+  map.on('click','weigh',e=>{const p=e.features[0].properties;
+    new mapboxgl.Popup({offset:10}).setLngLat(e.lngLat).setHTML(
+      `<div class="pp-t">${esc(p.name)}</div><div class="pp-m">${[p.ref,p.op].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}</div>`+
+      `<div class="row" style="margin-top:8px"><b>${p.st}</b>${pill(p.tier)}${p.src==='manual'?'<span class="pill" style="--c:#16a34a">manually confirmed</span>':''}</div>`+
+      (p.hot?`<div class="pp-hot"><b>Noted in reports:</b> ${esc(p.hot)}</div>`:'')+
+      (RISK[p.st]?`<div class="why">${esc(RISK[p.st].why)}</div>`:'')+
+      `<div class="pp-a"><a href="https://www.google.com/maps?q=${e.lngLat.lat},${e.lngLat.lng}" target="_blank" rel="noopener">Google Maps ↗</a><a href="${p.osm}" target="_blank" rel="noopener">OSM ↗</a></div>`).addTo(map);});
+  map.on('click','cross',e=>{const p=e.features[0].properties;
+    const s=st=>`<div class="row" style="margin-top:6px"><b>${st}</b>${pill(tierOf(st))}</div>`;
+    new mapboxgl.Popup({offset:10}).setLngLat(e.lngLat).setHTML(`<div class="pp-t">${esc(p.route)}</div><div class="pp-m">State-line crossing</div>${s(p.from)}${s(p.to)}`+
+      `<div class="pp-a"><a href="https://www.google.com/maps?q=${e.lngLat.lat},${e.lngLat.lng}" target="_blank" rel="noopener">Google Maps ↗</a></div>`).addTo(map);});
+  map.on('click','cam',e=>{const p=e.features[0].properties;
+    new mapboxgl.Popup({offset:10}).setLngLat(e.lngLat).setHTML(
+      `<div class="pp-t">ALPR camera${p.mfr?' · '+esc(p.mfr):''}</div><div class="pp-m">${esc(p.route)} · ${p.km} km from highway${p.op?' · '+esc(p.op):''}</div>`+
+      (p.prob?`<div class="pp-hot"><b>Flagged:</b> ${esc(p.why)}</div>`:'')+
+      `<div class="why">Direction: ${esc(p.dir||'unknown')} · Checked: ${esc(p.chk||'unknown')}<br>Source: OpenStreetMap (DeFlock data), reliability: community-reported</div>`+
+      `<div class="pp-a"><a href="https://www.openstreetmap.org/node/${p.id}" target="_blank" rel="noopener">OSM ↗</a><a href="https://deflock.org/map#map=17/${e.lngLat.lat}/${e.lngLat.lng}" target="_blank" rel="noopener">DeFlock ↗</a><a href="https://www.google.com/maps?q=${e.lngLat.lat},${e.lngLat.lng}" target="_blank" rel="noopener">Google ↗</a></div>`).addTo(map);});
+  map.on('click','cam-cl',e=>{const f=map.queryRenderedFeatures(e.point,{layers:['cam-cl']})[0];
+    map.getSource('cams').getClusterExpansionZoom(f.properties.cluster_id,(err,z)=>{if(!err) map.easeTo({center:f.geometry.coordinates,zoom:z});});});
+  updateCams();
+  ['weigh','cross','cam','cam-cl'].forEach(l=>{map.on('mouseenter',l,()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave',l,()=>map.getCanvas().style.cursor='');});
+});
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function applyFilters(){
+  if(!map.getLayer('weigh')) return;
+  const on=id=>document.getElementById(id).checked;
+  const q=document.getElementById('q').value.trim().toLowerCase();
+  const tiers=[['l-high','h'],['l-elev','e'],['l-norm','n'],['l-unk','u']].filter(([i])=>on(i)).map(x=>x[1]);
+  const kinds=[['l-xi','i'],['l-xu','u']].filter(([i])=>on(i)).map(x=>x[1]);
+  let wf=['in',['get','tier'],['literal',tiers]], cf=['in',['get','ki'],['literal',kinds]];
+  if(q){
+    wf=['all',wf,['any',['in',q,['downcase',['get','name']]],['==',['downcase',['get','st']],q],['in',q,['downcase',['get','op']]]]];
+    cf=['all',cf,['any',['in',q,['downcase',['get','route']]],['==',['downcase',['get','from']],q],['==',['downcase',['get','to']],q]]];
+  }
+  map.setFilter('weigh',wf); map.setFilter('weigh-halo',['all',wf,['==',['get','hotf'],1]]); map.setFilter('weigh-lbl',['all',wf,['!=',['get','tier'],'u']]);
+  map.setFilter('cross',cf); map.setFilter('cross-lbl',cf);
+  const vis=on('l-fill')?'visible':'none'; ['st-fill','st-line','st-lbl'].forEach(l=>map.setLayoutProperty(l,'visibility',vis));
+}
+document.querySelectorAll('#side input').forEach(i=>i.addEventListener('input',()=>{applyFilters();updateCams();}));
+
+// ---- cameras along corridors ----
+const PRIO=['I-5','I-10','I-15','I-20','I-35','I-40','I-55','I-65','I-70','I-75','I-80','I-81','I-85','I-90','I-95'];
+const ALLR=[...new Set(ROUTES.features.map(f=>f.properties.route))].sort((a,b)=>parseInt(a.slice(2))-parseInt(b.slice(2)));
+const selR=new Set(ALLR); let distKm=1, wKm=1, cMode='w';
+const chipBox=document.getElementById('routes');
+ALLR.forEach(r=>{const b=document.createElement('button'); b.className='chip'+(PRIO.includes(r)?'':' sm'); b.textContent=r; b.dataset.r=r;
+  b.onclick=()=>{selR.has(r)?selR.delete(r):selR.add(r); updateCams();}; chipBox.appendChild(b);});
+const setSel=list=>{selR.clear(); list.forEach(r=>selR.add(r)); updateCams();};
+document.getElementById('r-prio').onclick=e=>{e.preventDefault();setSel(PRIO);};
+document.getElementById('r-all').onclick=e=>{e.preventDefault();setSel(ALLR);};
+document.getElementById('r-none').onclick=e=>{e.preventDefault();setSel([]);};
+document.querySelectorAll('#dist button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#dist button').forEach(x=>x.classList.toggle('on',x===b)); distKm=+b.dataset.km; updateCams();});
+document.querySelectorAll('#wdist button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#wdist button').forEach(x=>x.classList.toggle('on',x===b)); wKm=+b.dataset.km; updateCams();});
+document.querySelectorAll('#cmode button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#cmode button').forEach(x=>x.classList.toggle('on',x===b)); cMode=b.dataset.m; updateCams();});
+
+let camView=[];
+function updateCams(){
+  chipBox.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',selR.has(c.dataset.r)));
+  const on=id=>document.getElementById(id).checked;
+  const base=CAMS.features.filter(f=>selR.has(f.properties.route) && f.properties.km<=distKm);
+  const atW=f=>f.properties.wkm<=wKm;
+  const sc=(id,n)=>document.getElementById(id).textContent='('+n.toLocaleString('en-US')+')';
+  sc('c-camw',base.filter(atW).length); sc('c-camp',base.filter(f=>f.properties.prob).length); sc('c-cama',base.length);
+  camView = cMode==='w' ? base.filter(atW) : cMode==='p' ? base.filter(f=>f.properties.prob) : base;
+  set('s-c',camView.length);
+  const w=document.getElementById('cam-warn');
+  if(!CAMS.features.length){w.hidden=false;w.textContent='Camera data has not loaded yet (the OSM server did not respond). The map still works without it.';}
+  else {w.hidden=true;}
+  if(!map.getSource('cams')) return;
+  map.getSource('cams').setData({type:'FeatureCollection',features:camView});
+  const rf=['in',['get','route'],['literal',[...selR]]];
+  const vis=on('l-rt')?'visible':'none';
+  ['rt-casing','rt','rt-lbl'].forEach(l=>{map.setFilter(l,rf);map.setLayoutProperty(l,'visibility',vis);});
+  if(map.getLayer('rtx')){
+    const refs=[...selR].map(r=>r.slice(2));
+    const xf=['all',['match',['get','class'],['motorway','trunk'],true,false],
+      ['match',['get','shield'],['us-interstate','us-interstate-duplex','us-interstate-truck'],true,false],
+      // shared sections carry refs like "39·90", so match each number inside the ref
+      ['any',false,...refs.map(r=>['in','·'+r+'·',['concat','·',['to-string',['get','ref']],'·']])]];
+    ['rtx-casing','rtx','rtx-lbl'].forEach(l=>{if(!map.getLayer(l))return;map.setFilter(l,xf);map.setLayoutProperty(l,'visibility',vis);});
+    const allSel=selR.size===ALLR.length;
+    ['rtg-casing','rtg'].forEach(l=>{if(map.getLayer(l))map.setLayoutProperty(l,'visibility',vis==='visible'&&allSel?'visible':'none');});
+  }
+}
+function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
+const ATTR='Data © OpenStreetMap contributors, ODbL (https://www.openstreetmap.org/copyright). Camera data as mapped for DeFlock.';
+document.getElementById('exp-geo').onclick=()=>download('alpr_kamere_koridori.geojson',JSON.stringify({type:'FeatureCollection',attribution:ATTR,features:camView}),'application/geo+json');
+document.getElementById('exp-csv').onclick=()=>{
+  const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const rows=[['osm_id','lat','lon','route','km_from_route','problematic','reason','manufacturer','operator','direction','check_date'].join(',')]
+    .concat(camView.map(f=>{const p=f.properties,[x,y]=f.geometry.coordinates;return [p.id,y,x,q(p.route),p.km,p.prob,q(p.why),q(p.mfr),q(p.op),q(p.dir),q(p.chk)].join(',');}));
+  rows.push(q(ATTR)); download('alpr_kamere_koridori.csv',rows.join('\n'),'text/csv');};
+updateCams();
+
+const names=Object.fromEntries(STATES.features.map(f=>[f.properties.st,f.properties.name]));
+const ul=document.getElementById('risk');
+Object.entries(RISK).forEach(([st,r])=>{
+  const n=WEIGH.features.filter(f=>f.properties.st===st && f.properties.cls==='enf').length;
+  const c=C[r.t];
+  const li=document.createElement('li'); li.style.setProperty('--c',c);
+  li.innerHTML=`<div class="row"><b>${names[st]||st}</b><span class="pill" style="--c:${c}">${r.t==='h'?'high':'elevated'}</span><span class="count">${n} stations</span></div><div class="why">${esc(r.why)}</div>`;
+  li.onclick=()=>{const f=STATES.features.find(x=>x.properties.st===st); if(!f) return;
+    const b=new mapboxgl.LngLatBounds(); const walk=c=>typeof c[0]==='number'?b.extend(c):c.forEach(walk); walk(f.geometry.coordinates);
+    const left = innerWidth>760 ? 400 : 40;
+    map.fitBounds(b,{padding:{top:40,bottom:40,left,right:40},maxZoom:7});};
+  ul.appendChild(li);
+});
+</script>
+</body>
+</html>

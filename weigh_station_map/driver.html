@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f1f5f9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Driver Mode</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="data.js"></script>
+<script src="cams.js"></script>
+<script src="routes_drive.js"></script>
+<style>
+  :root{--bg1:#eef2ff;--bg2:#f8fafc;--glass:rgba(255,255,255,.78);--ink:#0b1220;--muted:#64748b;--line:rgba(15,23,42,.08);
+    --high:#ef4444;--elev:#f59e0b;--norm:#3b82f6;--violet:#7c3aed;--shadow:0 12px 32px rgba(15,23,42,.10),0 2px 8px rgba(15,23,42,.06)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;color:var(--ink);font:16px/1.35 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  body{background:radial-gradient(120% 60% at 50% 0%,#dbeafe 0%,transparent 60%),linear-gradient(180deg,var(--bg1),var(--bg2));
+    display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));gap:12px;min-height:100%}
+  .glass{background:var(--glass);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);border:1px solid rgba(255,255,255,.7);box-shadow:var(--shadow)}
+  /* top bar */
+  .top{display:flex;align-items:center;gap:12px;border-radius:22px;padding:10px 12px}
+  .shield{width:54px;height:58px;flex:none;display:grid;place-items:center;color:#fff;font-weight:800;font-size:21px;letter-spacing:-.02em;padding-top:8px;
+    background:linear-gradient(180deg,#dc2626 0 26%,#fff 26% 30%,#1d4ed8 30%);
+    clip-path:path('M27 0 C34 4 44 5 54 3 C54 26 51 46 27 58 C3 46 0 26 0 3 C10 5 20 4 27 0Z');filter:drop-shadow(0 2px 4px rgba(0,0,0,.2))}
+  .shield.none{background:linear-gradient(180deg,#94a3b8,#64748b);font-size:15px;padding-top:0}
+  .top .t{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .top b{font-size:17px;font-weight:700;display:block;margin-top:1px}
+  .spd{margin-left:auto;min-width:74px;text-align:center;border-radius:16px;padding:6px 10px;background:linear-gradient(180deg,#0f172a,#1e293b);color:#fff}
+  .spd b{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.05;display:block}
+  .spd span{font-size:10px;font-weight:600;letter-spacing:.08em;opacity:.7}
+  /* road */
+  .road{position:relative;flex:1;min-height:250px;border-radius:26px;overflow:hidden;
+    background:linear-gradient(180deg,#bfdbfe 0%,#e0f2fe 28%,#dcfce7 29%,#bbf7d0 100%);box-shadow:var(--shadow)}
+  .road svg{position:absolute;inset:0;width:100%;height:100%}
+  .road .badge{position:absolute;left:12px;top:12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1e3a8a;background:rgba(255,255,255,.7);padding:4px 9px;border-radius:999px}
+  /* next station card */
+  .next{border-radius:24px;padding:16px;display:flex;gap:14px;align-items:center;position:relative;overflow:hidden}
+  .next::before{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:var(--c,#94a3b8)}
+  .ringwrap{position:relative;width:104px;height:104px;flex:none}
+  .ringwrap svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .ringwrap .val{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+  .dist{font-size:32px;font-weight:800;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+  .dist small{display:block;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.05em;margin-top:2px}
+  .info{min-width:0;flex:1}
+  .next .lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .nm{font-size:16px;font-weight:700;margin-top:3px;overflow-wrap:anywhere;line-height:1.25}
+  .meta{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .tag{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;color:var(--c);background:color-mix(in srgb,var(--c) 13%,white)}
+  .mini{border-radius:18px;padding:11px 14px;font-size:14px;display:flex;align-items:center;gap:10px}
+  .mini .ic{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--violet) 14%,white);flex:none}
+  .mini b{font-variant-numeric:tabular-nums}
+  /* controls */
+  .row{display:flex;gap:10px}
+  .btn{flex:1;border:0;border-radius:18px;padding:15px;font:inherit;font-weight:700;font-size:16px;color:#fff;
+    background:linear-gradient(180deg,#1e293b,#0f172a);box-shadow:0 8px 20px rgba(15,23,42,.25);display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn.sec{background:var(--glass);color:var(--ink);border:1px solid rgba(255,255,255,.7);box-shadow:var(--shadow);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);flex:0 0 auto;padding:15px 18px}
+  .btn.stop{background:linear-gradient(180deg,#f87171,#dc2626);box-shadow:0 8px 20px rgba(220,38,38,.3)}
+  .btn:active{transform:scale(.98)}
+  .note{font-size:12px;color:var(--muted);text-align:center;min-height:16px}
+  /* start screen */
+  #start{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:center;padding:28px 22px calc(28px + env(safe-area-inset-bottom));gap:16px;overflow:auto;
+    background:radial-gradient(100% 50% at 50% 0%,#c7d2fe 0%,transparent 70%),linear-gradient(180deg,#eef2ff,#f8fafc)}
+  .hero{width:72px;height:72px;border-radius:22px;display:grid;place-items:center;background:linear-gradient(135deg,#2563eb,#7c3aed);box-shadow:0 14px 30px rgba(79,70,229,.35)}
+  #start h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.02em}
+  #start p{margin:0;color:var(--muted)}
+  .feat{border-radius:20px;padding:6px 14px}
+  .feat div{display:flex;gap:12px;align-items:center;padding:10px 0;font-size:14.5px;font-weight:600}
+  .feat div+div{border-top:1px solid var(--line)}
+  .feat i{font-style:normal;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex:none;font-size:17px}
+  .legal{font-size:12.5px;color:var(--muted)}
+  #start .btn{flex:none} #start .row .btn{flex:1}
+  html,body{overflow-x:hidden}
+  .err{color:var(--high);font-weight:600}
+  .flash{animation:fl .9s ease 3}
+  @keyframes fl{50%{box-shadow:0 0 0 4px var(--c),var(--shadow)}}
+  @media (max-width:370px){ .ringwrap{width:88px;height:88px} .dist{font-size:27px} }
+</style>
+</head>
+<body>
+  <div class="top glass">
+    <div class="shield none" id="shield">—</div>
+    <div style="min-width:0"><div class="t">Current road</div><b id="roadname">Waiting for GPS…</b></div>
+    <div class="spd"><b id="speed">–</b><span>MPH</span></div>
+  </div>
+
+  <div class="road"><div class="badge">Next 20 mi</div><svg id="strip" viewBox="0 0 360 400" preserveAspectRatio="xMidYMax slice"></svg></div>
+
+  <div class="next glass" id="next">
+    <div class="ringwrap">
+      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="43" fill="none" stroke="rgba(15,23,42,.08)" stroke-width="9"/>
+        <circle id="ring" cx="50" cy="50" r="43" fill="none" stroke="var(--c,#94a3b8)" stroke-width="9" stroke-linecap="round" stroke-dasharray="270.2" stroke-dashoffset="270.2" style="transition:stroke-dashoffset .8s ease"/></svg>
+      <div class="val"><div class="dist" id="ndist">–</div></div>
+    </div>
+    <div class="info">
+      <div class="lbl">Next weigh station</div>
+      <div class="nm" id="nname">Looking for a station on your route…</div>
+      <div class="meta" id="nmeta"></div>
+      <div class="tags" id="ntags"></div>
+    </div>
+  </div>
+  <div class="mini glass" id="xline" hidden></div>
+
+  <div class="row">
+    <button class="btn sec" id="mute" aria-label="Mute">🔊</button>
+    <button class="btn sec" id="sim">▶ Demo</button>
+    <button class="btn stop" id="stopbtn">■ Stop</button>
+  </div>
+  <div class="note" id="status">Do not handle the phone while driving. Alerts are spoken.</div>
+
+<div id="start">
+  <div class="hero"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/></svg></div>
+  <div><h1>Driver Mode</h1><p style="margin-top:6px">Spoken alerts for state weigh stations on the Interstate you are driving.</p></div>
+  <div class="feat glass">
+    <div><i style="background:#dbeafe">📏</i>Alerts at 20, 10, 5, 2 and 1 mile</div>
+    <div><i style="background:#fee2e2">⚠️</i>High-risk stations and Flock cameras</div>
+    <div><i style="background:#ede9fe">🛑</i>Warning before a high-risk state</div>
+  </div>
+  <p class="legal">Keep the screen on and this page open. Mount the phone and set it up before you drive. Always enter an open weigh station; bypassing one is a violation.</p>
+  <button class="btn" id="go">Start driving</button>
+  <div class="row"><button class="btn sec" id="testvoice" style="flex:1">🔊 Test voice</button><button class="btn sec" id="go-demo" style="flex:1">▶ Demo</button></div>
+  <div id="starterr" class="err"></div>
+</div>
+
+<script>
+const RISK={CA:'h',TX:'h',AZ:'h',MD:'h',OR:'h',IN:'h',KY:'e',TN:'e',OK:'e',CT:'e',PA:'e',ND:'e',AR:'e',MO:'e',NM:'e'};
+const C={h:'#e5484d',e:'#f59e0b',n:'#2563eb'};
+const MI=1609.344, SHOW_MI=20; // a station is shown and announced from 20 miles out
+const $=id=>document.getElementById(id);
+function hav(lo1,la1,lo2,la2){const R=6371000,r=Math.PI/180,dp=(la2-la1)*r,dl=(lo2-lo1)*r;
+  const a=Math.sin(dp/2)**2+Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(a));}
+function brg(lo1,la1,lo2,la2){const r=Math.PI/180,y=Math.sin((lo2-lo1)*r)*Math.cos(la2*r),
+  x=Math.cos(la1*r)*Math.sin(la2*r)-Math.sin(la1*r)*Math.cos(la2*r)*Math.cos((lo2-lo1)*r);return (Math.atan2(y,x)/r+360)%360;}
+const adiff=(a,b)=>Math.abs(((a-b)%360+540)%360-180);
+const fmtMi=m=>{const mi=m/MI;return mi>=10?mi.toFixed(0):mi.toFixed(1);};
+
+// ---------- route geometry (no map service needed) ----------
+const PARTS=DRIVE_ROUTES.features.map(f=>{const c=f.geometry.coordinates, cum=[0];
+  for(let i=1;i<c.length;i++) cum.push(cum[i-1]+hav(c[i-1][0],c[i-1][1],c[i][0],c[i][1]));
+  return {ref:f.properties.route.replace(/^I-/,''), c, cum};});
+const GRID=new Map(), CELL=0.5;
+PARTS.forEach((p,pi)=>{for(let i=0;i<p.c.length-1;i++){const a=p.c[i], b=p.c[i+1];
+  for(let gx=Math.floor(Math.min(a[0],b[0])/CELL);gx<=Math.floor(Math.max(a[0],b[0])/CELL);gx++)
+  for(let gy=Math.floor(Math.min(a[1],b[1])/CELL);gy<=Math.floor(Math.max(a[1],b[1])/CELL);gy++){
+    const k=gx+','+gy; if(!GRID.has(k)) GRID.set(k,[]); GRID.get(k).push([pi,i]);}}});
+// nearest point on the route lines. opts: ref (only this road), maxM, heading (segment must align ±35°, either direction)
+function snap(lon,lat,opts={}){
+  const gx=Math.floor(lon/CELL), gy=Math.floor(lat/CELL), kx=111320*Math.cos(lat*Math.PI/180), ky=110540;
+  let best=null; const seen=new Set();
+  for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const L=GRID.get((gx+dx)+','+(gy+dy)); if(!L) continue;
+    for(const [pi,i] of L){const key=pi*1e6+i; if(seen.has(key)) continue; seen.add(key);
+      const p=PARTS[pi]; if(opts.ref && p.ref!==opts.ref) continue;
+      const a=p.c[i], b=p.c[i+1];
+      const ax=(a[0]-lon)*kx, ay=(a[1]-lat)*ky, bx=(b[0]-lon)*kx, by=(b[1]-lat)*ky;
+      const vx=bx-ax, vy=by-ay, L2=vx*vx+vy*vy||1;
+      const t=Math.max(0,Math.min(1,-(ax*vx+ay*vy)/L2)), px=ax+t*vx, py=ay+t*vy, d=Math.hypot(px,py);
+      if(d>(opts.maxM||1500)) continue;
+      const sb=brg(a[0],a[1],b[0],b[1]);
+      if(opts.heading!=null && Math.min(adiff(sb,opts.heading),adiff(sb,(opts.heading+180)%360))>35) continue;
+      if(!best||d<best.d) best={pi,ref:p.ref,d,along:p.cum[i]+t*(p.cum[i+1]-p.cum[i]),sb};}}
+  return best;
+}
+
+// ---------- stations / cameras / state lines, pre-snapped to their road ----------
+const CAMPTS=(window.CAMS?CAMS.features:[]).map(f=>f.geometry.coordinates);
+// shared sections have refs like "40·75": the station belongs to each of those Interstates
+const STN=WEIGH.features.filter(f=>f.properties.cls==='enf' && f.properties.rt).flatMap(f=>{
+  const [lon,lat]=f.geometry.coordinates, p=f.properties, cams=CAMPTS.filter(c=>hav(lon,lat,c[0],c[1])<=1000).length;
+  return String(p.rt).split('·').map(r=>r.replace(/[^0-9]/g,'')).filter(Boolean).map(rt=>
+    ({lon,lat,...p,rt,key:lon+','+lat, cams, snap:snap(lon,lat,{ref:rt,maxM:3000})}));});
+const XI=CROSS.features.filter(f=>f.properties.kind==='Interstate').map(f=>{const [lon,lat]=f.geometry.coordinates,p=f.properties, ref=p.route.replace(/^I-/,'');
+  return {lon,lat,...p,ref,snap:snap(lon,lat,{ref,maxM:3000})};});
+
+// ---------- which state am I in (point-in-polygon on simplified state shapes) ----------
+function inRing(x,y,r){let ins=false; for(let i=0,j=r.length-1;i<r.length;j=i++){const xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1];
+  if(((yi>y)!==(yj>y)) && (x<(xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi)) ins=!ins;} return ins;}
+function stateAt(lon,lat){ for(const f of STATES.features){const g=f.geometry, polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;
+  for(const P of polys){ if(inRing(lon,lat,P[0]) && !P.slice(1).some(h=>inRing(lon,lat,h))) return f.properties.st; } } return null; }
+let curState=null, stTick=0;
+
+// ---------- state ----------
+let last=null, heading=null, here=null, muted=false, watchId=null, simTimer=null, wake=null;
+const ROADBUF=[];
+function stableRoad(r){ROADBUF.push(r); if(ROADBUF.length>5) ROADBUF.shift();
+  const c={}; ROADBUF.forEach(x=>{if(x) c[x]=(c[x]||0)+1;});
+  const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0]; return top&&top[1]>=2?top[0]:null;}
+
+function onPos(lon,lat,spd,hdg){
+  if(last){const mv=hav(last.lon,last.lat,lon,lat);
+    if(spd!=null&&spd>3&&hdg!=null&&!isNaN(hdg)) heading=hdg; else if(mv>25) heading=brg(last.lon,last.lat,lon,lat);}
+  else if(spd!=null&&spd>3&&hdg!=null&&!isNaN(hdg)) heading=hdg;
+  last={lon,lat};
+  if(stTick++%5===0) curState=stateAt(lon,lat)||curState;
+  $('speed').textContent= spd!=null?Math.round(spd*2.23694):'–';
+  const s = heading!=null ? snap(lon,lat,{heading,maxM:1200}) : null;
+  const road = stableRoad(s?s.ref:null);
+  here = road ? snap(lon,lat,{ref:road,heading,maxM:1500}) : null;
+  if(here) here.dir = adiff(here.sb,heading)<90 ? 1 : -1;
+  render(road);
+}
+
+// items ahead on the same road: along-road distance on the same continuous line, else straight-line in a cone
+function ahead(list, road, maxM){
+  const out=[];
+  for(const it of list){
+    if(road && it.snap && it.snap.ref!==road) continue;
+    let d=null;
+    if(here && it.snap && it.snap.pi===here.pi){ const delta=(it.snap.along-here.along)*here.dir; if(delta>-80) d=Math.max(0,delta); }
+    else if(heading!=null && last){ const sd=hav(last.lon,last.lat,it.lon,it.lat);
+      if(adiff(brg(last.lon,last.lat,it.lon,it.lat),heading)<35 || sd<300) d=sd*1.05; }
+    if(d!=null && d<=maxM) out.push({it,d});
+  }
+  return out.sort((a,b)=>a.d-b.d);
+}
+
+function render(road){
+  const sh=$('shield');
+  if(road){sh.textContent=road; sh.className='shield'; $('roadname').textContent='Interstate '+road;}
+  else{sh.textContent='—'; sh.className='shield none'; $('roadname').textContent= last?(heading==null?'Detecting direction…':'Not on an Interstate'):'Waiting for GPS…';}
+
+  const st = heading!=null ? ahead(STN.filter(s=>!road||s.rt===road), road, 160000) : [];
+  const xs = road ? ahead(XI.filter(x=>x.ref===road), road, 50000) : [];
+  const n=st.find(o=>o.d<=SHOW_MI*MI), box=$('next');
+  if(!n){ box.style.setProperty('--c','#94a3b8'); $('ndist').innerHTML='–'; setRing(null);
+    $('nname').textContent= heading==null?'Start moving to detect direction…':'No weigh station within 20 mi';
+    $('nmeta').textContent=''; $('ntags').innerHTML=''; }
+  else{
+    const s=n.it, t=RISK[s.st]||'n';
+    box.style.setProperty('--c',C[t]);
+    $('ndist').innerHTML=`${fmtMi(n.d)}<small>MILES</small>`; setRing(n.d/MI);
+    $('nname').textContent=s.name;
+    $('nmeta').textContent=`I-${s.rt} · ${s.st}`;
+    const tags=[]; if(t==='h') tags.push(['High risk',C.h]); else if(t==='e') tags.push(['Elevated risk',C.e]);
+    if(s.hot) tags.push(['Strict enforcement',C.h]);
+    if(s.cams) tags.push([`${s.cams} Flock camera${s.cams>1?'s':''}`,'#0f172a']);
+    $('ntags').innerHTML=tags.map(([x,c])=>`<span class="tag" style="--c:${c}">${x}</span>`).join('');
+    alertFor(s,n.d,t);
+  }
+  const x=xs[0], xl=$('xline');
+  if(x){const into=enteringState(x.it); xl.hidden=false;
+    xl.style.setProperty('--violet', into&&RISK[into]?C[RISK[into]]:'#7c3aed');
+    xl.innerHTML=`<span class="ic">🛑</span><span>Entering <b>${into||(x.it.from+' / '+x.it.to)}</b> in <b>${fmtMi(x.d)} mi</b>${into&&RISK[into]?`<br><span style="color:${C[RISK[into]]};font-weight:700">${into}: ${RISK[into]==='h'?'high':'elevated'}-risk state</span>`:''}</span>`;
+    crossAlert(x);
+  } else xl.hidden=true;
+  drawStrip(st.slice(0,4), xs.slice(0,2), road);
+}
+
+// ---------- perspective road graphic ----------
+const SPAN=20; // miles shown (stations appear from 20 mi)
+const HOR=58, BOT=400, CX=180;
+const fz=mi=>{const k=5; return (1-1/(1+mi/k))/(1-1/(1+SPAN/k));};      // 0 at truck, 1 at horizon
+const yOf=d=>BOT-(BOT-HOR)*fz(Math.min(d/MI,SPAN));
+const half=y=>12+(150-12)*((y-HOR)/(BOT-HOR));                            // road half-width at y
+const scl=y=>.62+.48*((y-HOR)/(BOT-HOR));
+function drawStrip(st,xs,road){
+  const g=[], L=CX-half(BOT), R=CX+half(BOT);
+  g.push(`<defs><linearGradient id="asph" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#64748b"/><stop offset="1" stop-color="#1e293b"/></linearGradient>
+    <filter id="sh" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".25"/></filter></defs>`);
+  g.push(`<polygon points="${CX-12},${HOR} ${CX+12},${HOR} ${R},${BOT} ${L},${BOT}" fill="url(#asph)"/>`);
+  g.push(`<polyline points="${CX-12},${HOR} ${L},${BOT}" stroke="#fff" stroke-width="3" fill="none" opacity=".9"/><polyline points="${CX+12},${HOR} ${R},${BOT}" stroke="#fff" stroke-width="3" fill="none" opacity=".9"/>`);
+  for(let mi=0.25; mi<SPAN; mi*=1.35){const y1=yOf(mi*MI), y2=yOf(mi*1.12*MI); g.push(`<line x1="${CX}" y1="${y1}" x2="${CX}" y2="${y2}" stroke="#facc15" stroke-width="${3.5*scl(y1)}" stroke-linecap="round"/>`);}
+  for(const mi of [1,2,5,10,15]){const y=yOf(mi*MI), x=CX-half(y)-8;
+    g.push(`<text x="${x}" y="${y+4}" font-size="${11*scl(y)+2}" font-weight="600" text-anchor="end" fill="#1e3a8a" opacity=".7" font-family="Inter,sans-serif">${mi} mi</text>`);}
+  for(const {it,d} of xs){const y=yOf(d), h=half(y)+30;
+    g.push(`<line x1="${CX-h}" y1="${y}" x2="${CX+h}" y2="${y}" stroke="#7c3aed" stroke-width="${3*scl(y)+1}" stroke-dasharray="8 6"/>`);
+    g.push(`<g transform="translate(${CX-h} ${y-8}) scale(${scl(y)})" filter="url(#sh)"><rect x="-4" y="-16" width="52" height="22" rx="11" fill="#7c3aed"/><text x="22" y="0" font-size="12" font-weight="800" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif">${it.from}|${it.to}</text></g>`);}
+  for(const {it,d} of [...st].reverse()){ if(d/MI>SPAN) continue; const y=yOf(d), s=scl(y), x=CX+half(y)+10, c=C[RISK[it.st]||'n'];
+    g.push(`<g transform="translate(${x} ${y}) scale(${s})" filter="url(#sh)">
+      <line x1="-10" y1="0" x2="0" y2="0" stroke="${c}" stroke-width="3"/>
+      <rect x="0" y="-17" width="${it.cams?96:76}" height="34" rx="17" fill="#fff"/>
+      <circle cx="17" cy="0" r="13" fill="${c}"/><text x="17" y="5" font-size="13" font-weight="800" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif">W</text>
+      <text x="35" y="5" font-size="14" font-weight="800" fill="#0b1220" font-family="Inter,sans-serif">${fmtMi(d)}</text>
+      ${it.cams?`<circle cx="80" cy="0" r="9" fill="#0b1220"/><circle cx="80" cy="0" r="3.5" fill="#ef4444"/>`:''}</g>`);}
+  // truck (top view)
+  g.push(`<g transform="translate(${CX} ${BOT-46})" filter="url(#sh)"><rect x="-17" y="-8" width="34" height="50" rx="6" fill="#e2e8f0" stroke="#fff" stroke-width="2"/>
+    <rect x="-16" y="-34" width="32" height="24" rx="8" fill="#2563eb" stroke="#fff" stroke-width="2"/><rect x="-11" y="-30" width="22" height="7" rx="3" fill="#bfdbfe"/></g>`);
+  if(!road) g.push(`<g transform="translate(${CX} 200)"><rect x="-70" y="-16" width="140" height="32" rx="16" fill="rgba(15,23,42,.75)"/><text y="5" font-size="13" font-weight="700" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif">No Interstate</text></g>`);
+  $('strip').innerHTML=g.join('');
+}
+function setRing(mi){const r=$('ring'), full=270.2; r.style.strokeDashoffset = mi==null ? full : full*(Math.min(mi,SHOW_MI)/SHOW_MI);}
+drawStrip([],[],null);
+
+// ---------- alerts ----------
+const fired=new Map(), THR=[20,10,5,2,1,0.3];
+function alertFor(s,d,t){
+  const mi=d/MI; let set=fired.get(s.key); if(!set){set=new Set();fired.set(s.key,set);}
+  for(const th of THR){
+    if(mi<=th && !set.has(th)){
+      THR.filter(x=>x>th).forEach(x=>set.add(x)); set.add(th);
+      if(th!==0.3 && (th-mi)/th>0.15) continue; // already well past this mark (e.g. app started late): skip it silently
+      const risk=t==='h'?' High risk.':t==='e'?' Elevated risk.':'';
+      const cams=s.cams?` ${s.cams===1?'One Flock camera':s.cams+' Flock cameras'} at the station.`:'';
+      const msg= th===0.3?`Weigh station just ahead. ${s.name}. Follow the signs.`:
+        `Weigh station in ${th===1?'one mile':th+' miles'}. ${s.name}.${risk}${s.hot?' Strict enforcement reported.':''}${cams}`;
+      const clips=[{20:'ws20',10:'ws10',5:'ws5',2:'ws2',1:'ws1',0.3:'ws0'}[th]];
+      if(th!==0.3){ if(t==='h') clips.push('high'); else if(t==='e') clips.push('elev'); if(s.hot) clips.push('strict'); if(s.cams) clips.push('cams'); }
+      notify(msg, th<=2, clips); break;
+    }
+  }
+}
+const xfired=new Set();
+function enteringState(it){ if(curState===it.from) return it.to; if(curState===it.to) return it.from; return null; }
+function crossAlert(x){
+  const k=x.it.lon+','+x.it.lat; if(xfired.has(k)||x.d/MI>5) return; xfired.add(k);
+  const into=enteringState(x.it), risky=into&&RISK[into];
+  notify(`State line in five miles.${into?' Entering '+into+'.':''}${risky?' '+into+(RISK[into]==='h'?' is a high-risk state.':' is an elevated-risk state.'):''}`,false, risky?['line5','riskstate']:['line5']);
+}
+
+// recorded English voice clips (work wherever normal audio works)
+const player=new Audio(); player.preload='auto'; let clipQ=[];
+function playClips(ids){ if(muted||!ids||!ids.length) return; clipQ=ids.slice(); nextClip(); }
+function nextClip(){ const id=clipQ.shift(); if(!id) return; player.muted=false; player.src='audio/'+id+'.wav';
+  const p=player.play(); if(p&&p.catch) p.catch(()=>{ $('status').innerHTML='<span class="err">Sound is blocked. Tap “Test voice” once.</span>'; }); }
+player.addEventListener('ended',nextClip);
+let actx=null;
+function beep(strong){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+  [0,0.25].slice(0,strong?2:1).forEach(o=>{const g=actx.createGain(),os=actx.createOscillator();os.frequency.value=strong?880:660;
+    os.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.0001,actx.currentTime+o);g.gain.exponentialRampToValueAtTime(.4,actx.currentTime+o+.02);
+    g.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+o+.22);os.start(actx.currentTime+o);os.stop(actx.currentTime+o+.25);});}catch(e){}}
+function notify(text,strong,clips){
+  $('status').textContent=text; $('next').classList.remove('flash'); void $('next').offsetWidth; $('next').classList.add('flash');
+  if(!muted) beep(strong); setTimeout(()=>playClips(clips),strong?550:300);
+  if(navigator.vibrate) navigator.vibrate(strong?[300,150,300,150,300]:[250]);
+  try{ if('Notification' in window && Notification.permission==='granted' && document.visibilityState!=='visible') new Notification('Weigh station',{body:text}); }catch(e){}
+}
+function unlockAudio(){beep(false); try{player.src='audio/on.wav'; player.muted=true; const q=player.play();
+  if(q&&q.then) q.then(()=>{ if(player.muted){player.pause();player.muted=false;} }).catch(()=>{player.muted=false;});}catch(e){} }
+
+// ---------- start / stop / demo ----------
+async function keepAwake(){try{if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen');}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&(watchId!=null||simTimer)) keepAwake();});
+$('testvoice').onclick=()=>{ unlockAudio(); playClips(['test']); };
+$('go').onclick=async()=>{
+  unlockAudio(); keepAwake();
+  try{ if('Notification' in window && Notification.permission==='default') await Notification.requestPermission(); }catch(e){}
+  if(!('geolocation' in navigator)){ $('starterr').textContent='This browser does not support GPS.'; return; }
+  if(!window.isSecureContext){ $('starterr').textContent='GPS only works over HTTPS. Open this page from an HTTPS link.'; return; }
+  watchId=navigator.geolocation.watchPosition(p=>onPos(p.coords.longitude,p.coords.latitude,p.coords.speed,p.coords.heading),
+    e=>{$('status').innerHTML=`<span class="err">GPS error: ${e.message}</span>`;},{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+  $('start').style.display='none'; playClips(['on']);
+};
+function startDemo(){
+  // drive along the real I-44 line toward the Joplin station, starting 30 miles out, at 6x speed
+  unlockAudio(); keepAwake(); $('start').style.display='none';
+  if(watchId!=null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+  clearInterval(simTimer); fired.clear(); xfired.clear(); ROADBUF.length=0; heading=null; last=null; curState=null; stTick=0;
+  const J=STN.find(s=>/^Joplin/.test(s.name)); if(!J||!J.snap){ $('status').textContent='Demo data not found.'; return; }
+  const P=PARTS[J.snap.pi], end=P.cum[P.cum.length-1];
+  const westSign = P.c[0][0] < P.c[P.c.length-1][0] ? -1 : 1; // which way along the line is west
+  let along=Math.max(0, Math.min(end, J.snap.along + westSign*30*MI));
+  const dir=Math.sign(J.snap.along-along)||1, step=65/2.23694*6;
+  const at=a=>{a=Math.max(0,Math.min(end,a)); let i=1; while(i<P.cum.length-1 && P.cum[i]<a) i++;
+    const t=(a-P.cum[i-1])/((P.cum[i]-P.cum[i-1])||1);
+    return [P.c[i-1][0]+t*(P.c[i][0]-P.c[i-1][0]), P.c[i-1][1]+t*(P.c[i][1]-P.c[i-1][1])];};
+  simTimer=setInterval(()=>{const a=at(along), b=at(along+dir*60);
+    onPos(a[0],a[1],65/2.23694,brg(a[0],a[1],b[0],b[1]));
+    along+=dir*step; if((J.snap.along-along)*dir < -400) clearInterval(simTimer);},1000);
+  playClips(['demo']);
+}
+$('go-demo').onclick=startDemo; $('sim').onclick=startDemo;
+if(location.hash==='#demo') setTimeout(startDemo,300);
+$('stopbtn').onclick=()=>{ if(watchId!=null) navigator.geolocation.clearWatch(watchId); watchId=null; clearInterval(simTimer); simTimer=null;
+  try{wake&&wake.release();}catch(e){} player.pause(); clipQ=[]; $('start').style.display='flex'; fired.clear(); xfired.clear(); ROADBUF.length=0; };
+$('mute').onclick=()=>{muted=!muted; $('mute').textContent=muted?'🔇':'🔊'; if(muted){player.pause(); clipQ=[];}};
+</script>
+</body>
+</html>

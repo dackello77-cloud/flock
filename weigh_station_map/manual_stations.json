@@ -1,0 +1,54 @@
+[
+  {
+    "name": "NV DOT Weigh Station – I-15 / US-93 (North Las Vegas), side 1",
+    "lat": 36.33471642837548,
+    "lon": -114.91892349685207,
+    "state": "NV",
+    "route": "I-15",
+    "note": "Confirmed by user (Google Maps). Not tagged as a weigh station in OpenStreetMap."
+  },
+  {
+    "name": "NV DOT Weigh Station – I-15 / US-93 (North Las Vegas), side 2 (opposite direction)",
+    "lat": 36.335947288418254,
+    "lon": -114.91876095091476,
+    "state": "NV",
+    "route": "I-15",
+    "note": "Confirmed by user (Google Maps), opposite direction. Not tagged as a weigh station in OpenStreetMap."
+  },
+  {
+    "name": "Joplin I-44 Weigh Station (Eastbound), MM ~3",
+    "lat": 37.00618,
+    "lon": -94.56631,
+    "state": "MO",
+    "route": "I-44",
+    "note": "Location from OpenStreetMap. Westbound side is tagged CLOSED in OSM.",
+    "hot": "Carriers report very strict enforcement. Drivewyze lists Joplin among the highest-volume stations in Missouri. Two Flock ALPR cameras at the station (33 m and 168 m)."
+  },
+  {
+    "name": "Anthony Port of Entry (I-10 Westbound), MM ~159",
+    "lat": 32.06541,
+    "lon": -106.60612,
+    "state": "NM",
+    "route": "I-10",
+    "note": "Location read from Mapbox satellite imagery (scale house and inspection loop on the westbound side). Not tagged in OpenStreetMap.",
+    "hot": "New Mexico's primary inspection station (NMDOT). Open 24/7. Third-party FMCSA aggregate (truckcodex): ~10.9% out-of-service rate."
+  },
+  {
+    "name": "North Platte I-80 Weigh Station (Westbound)",
+    "lat": 41.09975,
+    "lon": -100.69011,
+    "state": "NE",
+    "route": "I-80",
+    "note": "Nebraska State Patrol Carrier Enforcement. Location from OpenStreetMap, confirmed on satellite imagery.",
+    "hot": "One of NSP's four I-80 scales. NSP also runs portable-scale sweeps on routes trucks use to avoid scales (Buffalo Co., Aug 2025: 212 violations, 19 out-of-service)."
+  },
+  {
+    "name": "North Platte I-80 Weigh Station (Eastbound)",
+    "lat": 41.0998,
+    "lon": -100.69608,
+    "state": "NE",
+    "route": "I-80",
+    "note": "Nebraska State Patrol Carrier Enforcement. Location from OpenStreetMap, confirmed on satellite imagery.",
+    "hot": "One of NSP's four I-80 scales. NSP also runs portable-scale sweeps on routes trucks use to avoid scales (Buffalo Co., Aug 2025: 212 violations, 19 out-of-service)."
+  }
+]
